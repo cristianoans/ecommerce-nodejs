@@ -2,8 +2,19 @@ const express = require('express');
 const produtos = express.Router();
 const Produto = require('../model/Produto');
 const Joi = require('joi');
+const multer = require('multer');
+const path = require('path');
 
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
+    },
+});
 
+const upload = multer({ storage });
 
 produtos.route('/')
     .get(async (req, res) => {
@@ -32,7 +43,7 @@ produtos.route('/')
         }
 
     })
-    .post(async (req, res) => {
+    .post(upload.array('imgProduto', 5), async (req, res) => {
 
         const postSchema = Joi.object({
             nome: Joi.string().required(),
@@ -41,8 +52,7 @@ produtos.route('/')
             preco: Joi.number().positive().required(),
             desconto: Joi.number().min(0).max(1).optional(),
             dataDesconto: Joi.date().iso().optional(),
-            categoria: Joi.string().required(),
-            imgProduto: Joi.string().required()
+            categoria: Joi.string().required()
         });
 
         const { error } = postSchema.validate(req.body);
@@ -51,11 +61,15 @@ produtos.route('/')
             return res.status(400).json({ message: error.details[0].message });
         }
 
-        const { nome, descricao, quantidade, preco, desconto, dataDesconto, categoria, imgProduto } = req.body;
+        const { nome, descricao, quantidade, preco, desconto, dataDesconto, categoria } = req.body;
 
         try {
+            const imgProduto = req.files.map(file => file.path.replace(/\\/g, '/'));
+            if(imgProduto.length === 0) {
+                return res.status(400).json({mensagem: "campo imagem é obrigatório"})
+            }
 
-            if (desconto && dataDesconto) {
+            if (typeof desconto !== 'undefined' && typeof dataDesconto !== 'undefined') {
                 const precoComDesconto = preco - (preco * desconto);
                 const produto = new Produto({ nome, descricao, quantidade, preco, desconto, precoComDesconto, dataDesconto, categoria, imgProduto });
                 await produto.save();
@@ -126,17 +140,16 @@ produtos.route('/')
         }
 
         const { id } = req.body;
-        
+
         try {
             const response = await Produto.findByIdAndRemove(id);
             if (!response) {
                 return res.status(404).json({ mensagem: "produto não encontrado" });
             }
-            res.status(200).json(response);
+            res.status(200).json({ mensagem: "produto excluido com sucesso.", produto: response });
         } catch (err) {
             res.status(500).json(err);
         }
     });
 
 module.exports = produtos;
-

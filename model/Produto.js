@@ -31,7 +31,7 @@ const Produto = model('produto',new Schema({
         require: true,
     },
     imgProduto: {
-        type: String,
+        type: [String],
         require: true,
     }
 }));
