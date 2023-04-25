@@ -72,23 +72,40 @@ produtos.route('/')
 
     })
     .put(async (req, res) => {
+        const putSchema = Joi.object({
+            id: Joi.string().required(),
+            nome: Joi.string().required(),
+            descricao: Joi.string().required(),
+            quantidade: Joi.number().integer().required(),
+            preco: Joi.number().positive().required(),
+            desconto: Joi.number().min(0).max(1).optional(),
+            dataDesconto: Joi.date().iso().optional(),
+            categoria: Joi.string().required(),
+            imgProduto: Joi.string().required()
+        });
+
+        const { error } = putSchema.validate(req.body);
+
+        if (error) {
+            return res.status(400).json({ message: error.details[0].message });
+        }
+
         const { id, nome, descricao, quantidade, preco, desconto, dataDesconto, categoria, imgProduto } = req.body;
+
         try {
-            if (!id || !nome || !descricao || !quantidade || !preco || !categoria || !imgProduto) {
-                return res.status(400).json({ message: "Campos obrigatórios ausentes." });
-            }
 
             const produtoEncontrado = await Produto.findById(id);
             if (!produtoEncontrado) {
                 return res.status(404).json({ message: "produto não encontrado!" });
             }
 
-            const response = await Produto.findByIdAndUpdate
-                (id, { nome, descricao, quantidade, preco, desconto, dataDesconto, categoria, imgProduto }, { new: true })
-            if (response) {
+            if (typeof desconto !== 'undefined' && typeof dataDesconto !== 'undefined') {
+                const precoComDesconto = preco - (preco * desconto);
+                const response = await Produto.findByIdAndUpdate(id, { nome, descricao, quantidade, preco, desconto, dataDesconto, precoComDesconto, categoria, imgProduto }, { new: true })
                 res.status(200).json(response);
             } else {
-                res.status(404).json({ mensagem: "produto não encontrado" });
+                const response = await Produto.findByIdAndUpdate(id, { nome, descricao, quantidade, preco, categoria, imgProduto }, { new: true })
+                res.status(200).json(response);
             }
 
         } catch (err) {
