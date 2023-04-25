@@ -18,10 +18,10 @@ app.use('/produtos', produtos);
 app.use(express.static('uploads'))
 app.get('/uploads/:filename', (req, res) => {
     const filename = req.params.filename;
-      res.sendFile(`${__dirname}/uploads/${filename}`);
-  });
+    res.sendFile(`${__dirname}/uploads/${filename}`);
+});
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
-app.listen(3000, () =>{
+app.listen(3000, () => {
     console.log('http://localhost:3000');
 })
