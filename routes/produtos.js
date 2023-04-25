@@ -2,6 +2,7 @@ const express = require('express');
 const produtos = express.Router();
 const Produto = require('../model/Produto');
 const Joi = require('joi');
+const moment = require('moment');
 const multer = require('multer');
 const path = require('path');
 
@@ -55,6 +56,14 @@ produtos.route('/')
             categoria: Joi.string().required()
         });
 
+        if (req.body.dataDesconto) {
+            const momentDate = moment(req.body.dataDesconto, 'DD/MM/YYYY', true);
+            if (!momentDate.isValid()) {
+                return res.status(400).json({ message: 'Data inválida. O formato esperado é DD/MM/YYYY.' });
+            }
+            req.body.dataDesconto = momentDate.format('YYYY-MM-DD');
+        }
+
         const { error } = postSchema.validate(req.body);
 
         if (error) {
@@ -65,8 +74,8 @@ produtos.route('/')
 
         try {
             const imgProduto = req.files.map(file => file.path.replace(/\\/g, '/'));
-            if(imgProduto.length === 0) {
-                return res.status(400).json({mensagem: "campo imagem é obrigatório"})
+            if (imgProduto.length === 0) {
+                return res.status(400).json({ mensagem: "campo imagem é obrigatório" })
             }
 
             if (typeof desconto !== 'undefined' && typeof dataDesconto !== 'undefined') {
@@ -98,6 +107,14 @@ produtos.route('/')
             imgProduto: Joi.string().required()
         });
 
+        if (req.body.dataDesconto) {
+            const momentDate = moment(req.body.dataDesconto, 'DD/MM/YYYY', true);
+            if (!momentDate.isValid()) {
+                return res.status(400).json({ message: 'Data inválida. O formato esperado é DD/MM/YYYY.' });
+            }
+            req.body.dataDesconto = momentDate.format('YYYY-MM-DD');
+        }
+        
         const { error } = putSchema.validate(req.body);
 
         if (error) {

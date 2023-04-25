@@ -248,9 +248,7 @@
                     "description": "ID do produto."
                   }
                 },
-                "required": [
-                  "id"
-                ]
+                "required": ["id"]
               }
             }
           }
