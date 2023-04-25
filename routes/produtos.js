@@ -1,7 +1,9 @@
 const express = require('express');
 const produtos = express.Router();
 const Produto = require('../model/Produto');
-const { errorMonitor } = require('events');
+const Joi = require('joi');
+
+
 
 produtos.route('/')
     .get(async (req, res) => {
@@ -31,13 +33,31 @@ produtos.route('/')
 
     })
     .post(async (req, res) => {
+
+        const postSchema = Joi.object({
+            nome: Joi.string().required(),
+            descricao: Joi.string().required(),
+            quantidade: Joi.number().integer().required(),
+            preco: Joi.number().positive().required(),
+            desconto: Joi.number().min(0).max(1).optional(),
+            dataDesconto: Joi.date().iso().optional(),
+            categoria: Joi.string().required(),
+            imgProduto: Joi.string().required()
+        });
+
+        const { error } = postSchema.validate(req.body);
+
+        if (error) {
+            return res.status(400).json({ message: error.details[0].message });
+        }
+
         const { nome, descricao, quantidade, preco, desconto, dataDesconto, categoria, imgProduto } = req.body;
+
         try {
-            if (!nome || !descricao || !quantidade || !preco || !categoria || !imgProduto) {
-                return res.status(400).json({ message: "Campos obrigatórios ausentes." });
-            }
+
             if (desconto && dataDesconto) {
-                const produto = new Produto({ nome, descricao, quantidade, preco, desconto, dataDesconto, categoria, imgProduto });
+                const precoComDesconto = preco - (preco * desconto);
+                const produto = new Produto({ nome, descricao, quantidade, preco, desconto, precoComDesconto, dataDesconto, categoria, imgProduto });
                 await produto.save();
                 res.status(201).json(produto);
             } else {
