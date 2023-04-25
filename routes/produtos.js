@@ -115,7 +115,18 @@ produtos.route('/')
 
     })
     .delete(async (req, res) => {
+        const deleteSchema = Joi.object({
+            id: Joi.string().required()
+        });
+
+        const { error } = deleteSchema.validate(req.body);
+
+        if (error) {
+            return res.status(400).json({ message: error.details[0].message });
+        }
+
         const { id } = req.body;
+        
         try {
             const response = await Produto.findByIdAndRemove(id);
             if (!response) {
