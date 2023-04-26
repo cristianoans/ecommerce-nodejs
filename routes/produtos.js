@@ -2,11 +2,14 @@ const express = require('express');
 const produtos = express.Router();
 const Produto = require('../model/Produto');
 const Joi = require('joi');
+const mime = require('mime-types');
 const moment = require('moment');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
-const storage = multer.diskStorage({
+
+const storage = multer.diskStorage({ // função que define o nome do arquivo a ser gravado localmente, bem como em qual pasta será gravado.
     destination: (req, file, cb) => {
         cb(null, 'uploads/');
     },
@@ -44,9 +47,9 @@ produtos.route('/')
         }
 
     })
-    .post(upload.array('imgProduto', 5), async (req, res) => {
+    .post(upload.array('imgProduto', 5), async (req, res) => { // aqui informamos que esperamos receber um array de arquivos com tamanho máximo de 5.
 
-        const postSchema = Joi.object({
+        const postSchema = Joi.object({ // este schema define o tipo de cada dado presente na requisição para que façamos a validação.
             nome: Joi.string().required(),
             descricao: Joi.string().required(),
             quantidade: Joi.number().integer().required(),
@@ -56,40 +59,52 @@ produtos.route('/')
             categoria: Joi.string().required()
         });
 
-        if (req.body.dataDesconto) {
+        if (req.body.dataDesconto) { // esta função determina o formato esperado para a dataDesconto
             const momentDate = moment(req.body.dataDesconto, 'DD/MM/YYYY', true);
-            if (!momentDate.isValid()) {
+            if (!momentDate.isValid()) { // se não tiver no formato encerra o código e retorna erro ao usuário
                 return res.status(400).json({ message: 'Data inválida. O formato esperado é DD/MM/YYYY.' });
             }
-            req.body.dataDesconto = momentDate.format('YYYY-MM-DD');
+            req.body.dataDesconto = momentDate.format('YYYY-MM-DD'); // se o formato for válido, converte para o formato da iso e reatribui o valor na requisição para então validar com o Joi
         }
 
-        const { error } = postSchema.validate(req.body);
+        const { error } = postSchema.validate(req.body); // usa a função validate do Joi, caso gere algum erro a variavel error será definida
 
-        if (error) {
+        if (error) { // se a variavel tiver definida, retornamos o erro ao usuário e encerramos o código.
             return res.status(400).json({ message: error.details[0].message });
         }
 
+        // desestruturação dos campos da requisição para gravar o objeto a ser criado.
         const { nome, descricao, quantidade, preco, desconto, dataDesconto, categoria } = req.body;
 
         try {
-            const imgProduto = req.files.map(file => file.path.replace(/\\/g, '/'));
-            if (imgProduto.length === 0) {
+            
+            //valida se o array de imagens está vazio
+            if (req.files.length === 0) { // se array vazio encerra o a execução e retorna erro ao usuário
                 return res.status(400).json({ mensagem: "campo imagem é obrigatório" })
             }
 
-            if (typeof desconto !== 'undefined' && typeof dataDesconto !== 'undefined') {
+            for (const imagem of req.files) { // percorre cada arquivo enviado na requisição 
+                if (!validaArquivo(imagem.originalname)) { // enviamos o arquivo para a função e ela verifica se é imagem ou não
+                    fs.unlink(imagem.path, () => {}); // se não for imagem esta linha remove o arquivo da pasta antes de finalizar o código com erro ao usuário.
+                    return res.status(400).json({ mensagem: 'Arquivo inválido. Somente imagens são permitidas.' });
+                }
+            }
+
+            // define o nome do arquivo a ser gravado na pasta upload bem como seu caminho para ser gravado no banco de dados.
+            const imgProduto = req.files.map(file => file.path.replace(/\\/g, '/'));
+
+            // verifica se o campo desconto e dataDesconto foram informados na requisição
+            if (typeof desconto !== 'undefined' && typeof dataDesconto !== 'undefined') { // se positivo gera o preco com desconto e grava o objeto com este campo.
                 const precoComDesconto = preco - (preco * desconto);
                 const produto = new Produto({ nome, descricao, quantidade, preco, desconto, precoComDesconto, dataDesconto, categoria, imgProduto });
                 await produto.save();
                 res.status(201).json(produto);
-            } else {
+            } else { // se não for informado o desconto e dataDesconto, gravamos o objeto somente com o preco original e sem os dados de desconto.
                 const produto = new Produto({ nome, descricao, quantidade, preco, categoria, imgProduto });
                 await produto.save();
                 res.status(201).json(produto);
             }
-        } catch (err) {
-            console.log(err);
+        } catch (err) { // se ocorrer algum erro no banco de dados retornamos o erro para o usuário.
             res.status(500).json(err);
         }
 
@@ -114,7 +129,7 @@ produtos.route('/')
             }
             req.body.dataDesconto = momentDate.format('YYYY-MM-DD');
         }
-        
+
         const { error } = putSchema.validate(req.body);
 
         if (error) {
@@ -168,5 +183,13 @@ produtos.route('/')
             res.status(500).json(err);
         }
     });
+
+
+function validaArquivo(nomeArquivo) { // função que verifica se o tipo de arquivo enviado é do tipo imagem
+    const extensao = nomeArquivo.split('.').pop(); // faz o split para extrair a extensao do nome do arquivo
+    const tipoMIME = mime.lookup(extensao); // usa a função do mime "lookup" para comparar a extensão
+
+    return tipoMIME && tipoMIME.startsWith('image/');
+}
 
 module.exports = produtos;
